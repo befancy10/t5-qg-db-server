@@ -9,10 +9,15 @@ const PORT = process.env.PORT || 3000;
 
 // MySQL database connection configuration
 const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'website_user',
-    password: 'Surabaya!123',
-    database: 'crossword_db'
+    host: process.env.MYSQLHOST || 'localhost',
+    user: process.env.MYSQLUSER || 'website_user', 
+    password: process.env.MYSQLPASSWORD || 'Surabaya!123',
+    database: process.env.MYSQLDATABASE || 'crossword_db',
+    port: process.env.MYSQLPORT || 3306,
+    // Tambahan untuk koneksi yang lebih stabil
+    acquireTimeout: 60000,
+    timeout: 60000,
+    reconnect: true
 });
 
 
@@ -20,9 +25,11 @@ const connection = mysql.createConnection({
 connection.connect(err => {
     if (err) {
         console.error('Error connecting to database:', err.stack);
+        console.error('Error code:', err.code);
+        console.error('Error message:', err.message);
         return;
     }
-    console.log('Connected to database as id', connection.threadId);
+    console.log('Connected to Railway MySQL database as id', connection.threadId);
 });
 
 
