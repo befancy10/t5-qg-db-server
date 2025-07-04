@@ -5,15 +5,19 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS Configuration
+// CORS Configuration - ADD your Vercel domain
 app.use(cors({
     origin: [
         'http://localhost:3000',
         'http://localhost:5173', 
-        'https://your-frontend-domain.vercel.app', // Ganti dengan domain Vercel Anda nanti
-        'https://*.vercel.app' // Allows all Vercel subdomains
+        'http://localhost:8080',
+        'https://t5-qg-frontend-qgfn.vercel.app',  // ADD this line - your exact Vercel domain
+        'https://*.vercel.app',                    // Wildcard for all Vercel subdomains
+        'https://vercel.app'                       // Base domain
     ],
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Database Connection
