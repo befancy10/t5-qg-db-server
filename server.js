@@ -1,13 +1,22 @@
 const express = require('express');
-const path = require('path');
 const mysql = require('mysql');
+const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Database Connection
+// CORS Configuration
+app.use(cors({
+    origin: [
+        'http://localhost:3000',
+        'http://localhost:5173', 
+        'https://your-frontend-domain.vercel.app', // Ganti dengan domain Vercel Anda nanti
+        'https://*.vercel.app' // Allows all Vercel subdomains
+    ],
+    credentials: true
+}));
 
-// MySQL database connection configuration
+// Database Connection
 const connection = mysql.createConnection({
     host: process.env.MYSQLHOST || 'localhost',
     user: process.env.MYSQLUSER || 'website_user', 
@@ -20,6 +29,12 @@ const connection = mysql.createConnection({
     reconnect: true
 });
 
+// Debug Database Configuration
+console.log('Database Configuration:');
+console.log('Host:', process.env.MYSQLHOST || 'localhost');
+console.log('User:', process.env.MYSQLUSER || 'website_user');
+console.log('Database:', process.env.MYSQLDATABASE || 'crossword_db');
+console.log('Port:', process.env.MYSQLPORT || 3306);
 
 // Connect to MySQL
 connection.connect(err => {
@@ -29,13 +44,10 @@ connection.connect(err => {
         console.error('Error message:', err.message);
         return;
     }
-    console.log('Connected to Railway MySQL database as id', connection.threadId);
+    console.log('✅ Connected to Railway MySQL database as id', connection.threadId);
 });
 
-
 // Table Creation Queries
-
-// Create the imported_crosswords table if it does not exist
 const createTableQuery = `
     CREATE TABLE IF NOT EXISTS imported_crosswords (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -83,6 +95,7 @@ CREATE TABLE IF NOT EXISTS mcq_leaderboard (
 );
 `;
 
+// Create Tables
 connection.query(createTableQuery, (error, results, fields) => {
   if (error) {
       console.error('Error creating table:', error);
@@ -115,38 +128,36 @@ connection.query(createMCQLeaderboard, (error, results, fields) => {
     console.log('mcq_leaderboard Table created or already exists.');
 });
 
-
 // Middleware
-
-// Middleware to parse URL-encoded bodies (from form submissions)
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware to parse JSON bodies
 app.use(express.json());
 
-// Serve static files from the "css" and "js" directories
-app.use('/css', express.static(path.join(__dirname, 'frontend/css')));
-app.use('/js', express.static(path.join(__dirname, 'frontend/js')));
-app.use('/dist', express.static(path.join(__dirname, 'frontend/dist')));
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        message: 'Elementary Quiz Generator API is running',
+        timestamp: new Date().toISOString(),
+        database: connection.state
+    });
+});
 
-// Serve static files from the 'pap' folder
-app.use('/pap', express.static(path.join(__dirname, 'frontend/pap')));
-
-// Serve the index.html file at the root route
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'index.html')));
-app.get('/select_role.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'select_role.html')));
-app.get('/user_input.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'user_input.html')));
-app.get('/user_key_input.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'user_key_input.html')));
-app.get('/display_question_answer.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'display_question_answer.html')));
-app.get('/get_crosswords.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'get_crosswords.html')));
-app.get('/leaderboard.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'leaderboard.html')));
-app.get('/get_mcq.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'get_mcq.html')));
-app.get('/leaderboard_mcq.html', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'leaderboard_mcq.html')));
-
+// Root endpoint (untuk testing)
+app.get('/', (req, res) => {
+    res.json({ 
+        message: 'Elementary Quiz Generator API',
+        description: 'T5-based Question Generation for English Grade 3-4',
+        version: '1.0.0',
+        endpoints: {
+            crosswords: '/check-key/:key',
+            mcq: '/check-mcq/:key',
+            leaderboard: '/leaderboard/:key',
+            health: '/health'
+        }
+    });
+});
 
 // API - Crossword Export to DB
-
-// Route to handle POST requests for importing crossword data into MySQL
 app.post('/display_question_answer', (req, res) => {
     const { crosswordData, questions, answers, passage, generatedKey } = req.body;
 
@@ -179,7 +190,6 @@ app.post('/display_question_answer', (req, res) => {
         res.json({ message: 'Crossword data inserted into MySQL successfully' });
     });
 });
-
 
 // API - MCQ Export to DB
 app.post('/export_mcq_data', (req, res) => {
@@ -215,13 +225,10 @@ app.post('/export_mcq_data', (req, res) => {
   });
 });
 
-
 // Key & Name Check Routes
-
 app.get('/check-key/:key', (req, res) => {
   const key = req.params.key;
 
-  // Query to check if key exists
   const sql = 'SELECT * FROM imported_crosswords WHERE generatedKey = ?';
   connection.query(sql, [key], (error, results) => {
     if (error) {
@@ -231,7 +238,6 @@ app.get('/check-key/:key', (req, res) => {
     }
 
     if (results.length > 0) {
-      // Key found, return data
       const crosswordData = results[0].crosswordData;
       const questions = results[0].questions;
       const answers = results[0].answers;
@@ -244,7 +250,6 @@ app.get('/check-key/:key', (req, res) => {
         passage: passage
       });
     } else {
-      // Key not found
       res.json({ found: false });
     }
   });
@@ -262,7 +267,6 @@ app.get('/check-mcq/:key', (req, res) => {
       }
 
       if (results.length > 0) {
-        // Key found, return data
         const questions = results[0].questions;
         const options = results[0].options;
         const correct_answers = results[0].correct_answers;
@@ -276,7 +280,6 @@ app.get('/check-mcq/:key', (req, res) => {
             passage: passage
         });
       } else {
-        // Key not found
         res.json({ found: false });
       }
   });
@@ -350,7 +353,6 @@ app.get('/get-name/:name', (req, res) => {
     }
 
     if (results.length > 0) {
-      // Key found, return data
       const name = results[0].name;
       const key = results[0].key;
       res.json({
@@ -359,7 +361,6 @@ app.get('/get-name/:name', (req, res) => {
         key: key
       });
     } else {
-      // Name not found
       res.json({ found: false });
     }
   });
@@ -377,7 +378,6 @@ app.get('/get-mcq-name/:name', (req, res) => {
     }
 
     if (results.length > 0) {
-      // Key found, return data
       const name = results[0].name;
       const key = results[0].key;
       res.json({
@@ -386,7 +386,6 @@ app.get('/get-mcq-name/:name', (req, res) => {
         key: key
       });
     } else {
-      // Name not found
       res.json({ found: false });
     }
   });
@@ -395,16 +394,13 @@ app.get('/get-mcq-name/:name', (req, res) => {
 app.post('/save-name', (req, res) => {
   const { name, key } = req.body;
 
-  // Log received data
   console.log('Received data:', { name, key });
 
-  // Verify received data
   if (!name || !key) {
     console.error('Invalid data received');
     return res.status(400).json({ error: 'Invalid data received' });
   }
 
-  // Save the name to the database
   const queryStoreName = 'INSERT INTO crossword_leaderboard (name, generatedKey) VALUES (?, ?)';
   connection.query(queryStoreName, [name, key], (err, results) => {
     if (err) {
@@ -431,7 +427,7 @@ app.post('/save-mcq-name', (req, res) => {
     if (err) {
       if (err.code === 'ER_DUP_ENTRY') {
         console.warn('Duplicate entry attempted:', { name, key });
-        return res.status(200).json({ message: 'Already exists' }); // safe fallback
+        return res.status(200).json({ message: 'Already exists' });
       }
       console.error('Error saving MCQ user name:', err);
       return res.status(500).json({ error: 'Failed to save MCQ user name', mysqlError: err });
@@ -441,13 +437,10 @@ app.post('/save-mcq-name', (req, res) => {
   });
 });
 
-
 // Leaderboard Routes
-
 app.get('/leaderboard/:key', (req, res) => {
   const key = req.params.key;
 
-  // Query to check if key exists and order by time_taken with 0 time_taken at the bottom
   const sql = `
     SELECT * 
     FROM crossword_leaderboard 
@@ -472,7 +465,6 @@ app.get('/leaderboard/:key', (req, res) => {
         leaderboard: leaderboard
       });
     } else {
-      // Key not found
       res.json({ found: false });
     }
   });
@@ -502,15 +494,12 @@ app.get('/leaderboard-mcq/:key', (req, res) => {
           leaderboard: leaderboard
         });
       } else {
-        // Key not found
         res.json({ found: false });
       }
   });
 });
 
-
-// Update Crossword result
-
+// Update Results
 app.post("/update-is-done", (req, res) => {
   const { key, name, time } = req.body;
   
@@ -518,7 +507,6 @@ app.post("/update-is-done", (req, res) => {
   console.log("Received name:", name);
   console.log("Received time:", time);
 
-  // Query to update is_done
   const sql =`
     UPDATE crossword_leaderboard 
     SET is_done = 1, time_taken = ? 
@@ -536,7 +524,6 @@ app.post("/update-is-done", (req, res) => {
   });
 });
 
-// Update MCQ result 
 app.post('/update-mcq-result', (req, res) => {
   const { name, score, time, key  } = req.body;
 
@@ -565,29 +552,7 @@ app.post('/update-mcq-result', (req, res) => {
   });
 });
 
-
-
-// Save MCQ result 
-// app.post('/save-mcq-result', (req, res) => {
-//   const { name, score, time_taken, generatedKey } = req.body;
-
-//   const sql = `
-//       INSERT INTO mcq_leaderboard (name, score, time_taken, is_done, generatedKey)
-//       VALUES (?, ?, ?, ?, ?)
-//   `;
-
-//   connection.query(sql, [name, score, time_taken, true, generatedKey], (err, results) => {
-//       if (err) {
-//           console.error('Error saving MCQ result:', err);
-//           return res.status(500).json({ error: 'Failed to save MCQ result', mysqlError: err });
-//       }
-//       res.json({ message: 'Result saved successfully' });
-//   });
-// });
-
-
 // GeneratedKey Availability Check
-
 app.get('/check-key-availability/:key', (req, res) => {
   const key = req.params.key;
 
@@ -611,9 +576,9 @@ app.get('/check-key-availability/:key', (req, res) => {
   });
 });
 
-
 // Start Server
-
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Elementary Quiz Generator API running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Target: English Quiz Generation for Grade 3-4`);
 });
