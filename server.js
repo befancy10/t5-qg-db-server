@@ -30,22 +30,34 @@ const connection = mysql.createConnection({
 });
 
 // Debug Database Configuration
-console.log('Database Configuration:');
+console.log('=== DATABASE CONFIGURATION ===');
 console.log('Host:', process.env.MYSQLHOST || 'localhost');
 console.log('User:', process.env.MYSQLUSER || 'website_user');
 console.log('Database:', process.env.MYSQLDATABASE || 'crossword_db');
 console.log('Port:', process.env.MYSQLPORT || 3306);
 
-// Connect to MySQL
-connection.connect(err => {
-    if (err) {
-        console.error('Error connecting to database:', err.stack);
-        console.error('Error code:', err.code);
-        console.error('Error message:', err.message);
-        return;
-    }
-    console.log('✅ Connected to Railway MySQL database as id', connection.threadId);
-});
+// Validate Required Environment Variables
+if (!process.env.MYSQLHOST || !process.env.MYSQLUSER || !process.env.MYSQLPASSWORD) {
+    console.error('Missing required MySQL environment variables!');
+    console.error('Required: MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE');
+    console.error('Make sure MySQL service is added to Railway project and variables are linked');
+}
+
+// Connect to MySQL with retry logic
+const connectWithRetry = () => {
+    connection.connect(err => {
+        if (err) {
+            console.error('Error connecting to database:', err.code);
+            console.error('Error message:', err.message);
+            console.error('Retrying in 5 seconds...');
+            setTimeout(connectWithRetry, 5000);
+            return;
+        }
+        console.log('Connected to Railway MySQL database as id', connection.threadId);
+    });
+};
+
+connectWithRetry();
 
 // Table Creation Queries
 const createTableQuery = `
