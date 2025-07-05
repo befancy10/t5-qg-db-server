@@ -11,7 +11,8 @@ app.use(cors({
         'http://localhost:3000',
         'http://localhost:5173', 
         'http://localhost:8080',
-        'https://t5-qg-frontend-qgfn.vercel.app',  // ADD this line - your exact Vercel domain
+        'https://t5-qg-frontend.vercel.app/',  // ADD this line - your exact Vercel domain
+        'https://t5-qg-frontend-bernisko-fancys-projects.vercel.app/',
         'https://*.vercel.app',                    // Wildcard for all Vercel subdomains
         'https://vercel.app'                       // Base domain
     ],
