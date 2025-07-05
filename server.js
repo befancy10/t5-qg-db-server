@@ -11,8 +11,9 @@ app.use(cors({
         'http://localhost:3000',
         'http://localhost:5173', 
         'http://localhost:8080',
-        'https://t5-qg-frontend.vercel.app/',  // ADD this line - your exact Vercel domain
-        'https://t5-qg-frontend-bernisko-fancys-projects.vercel.app/',
+        'https://t5-qg-frontend.vercel.app',  // ADD this line - your exact Vercel domain
+        'https://t5-qg-frontend-bernisko-fancys-projects.vercel.app',
+        'https://t5-qg-frontend-qgfn.vercel.app',
         'https://*.vercel.app',                    // Wildcard for all Vercel subdomains
         'https://vercel.app'                       // Base domain
     ],
@@ -21,46 +22,59 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Database Connection
+// Database Connection Improved Database Connection with better error handling
 const connection = mysql.createConnection({
-    host: process.env.MYSQLHOST || 'localhost',
-    user: process.env.MYSQLUSER || 'website_user', 
-    password: process.env.MYSQLPASSWORD || 'Surabaya!123',
-    database: process.env.MYSQLDATABASE || 'crossword_db',
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER, 
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT || 3306,
-    // Tambahan untuk koneksi yang lebih stabil
+    // Enhanced connection options
     acquireTimeout: 60000,
     timeout: 60000,
-    reconnect: true
+    reconnect: true,
+    multipleStatements: false,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Debug Database Configuration
-console.log('=== DATABASE CONFIGURATION ===');
-console.log('Host:', process.env.MYSQLHOST || 'localhost');
-console.log('User:', process.env.MYSQLUSER || 'website_user');
-console.log('Database:', process.env.MYSQLDATABASE || 'crossword_db');
-console.log('Port:', process.env.MYSQLPORT || 3306);
-
-// Validate Required Environment Variables
-if (!process.env.MYSQLHOST || !process.env.MYSQLUSER || !process.env.MYSQLPASSWORD) {
-    console.error('Missing required MySQL environment variables!');
-    console.error('Required: MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE');
-    console.error('Make sure MySQL service is added to Railway project and variables are linked');
-}
-
-// Connect to MySQL with retry logic
+// Enhanced connection function with better error handling
 const connectWithRetry = () => {
     connection.connect(err => {
         if (err) {
-            console.error('Error connecting to database:', err.code);
+            console.error('=== DATABASE CONNECTION ERROR ===');
+            console.error('Error code:', err.code);
             console.error('Error message:', err.message);
+            console.error('Error errno:', err.errno);
+            console.error('Error sqlState:', err.sqlState);
+            
+            // Check specific error types
+            if (err.code === 'ECONNREFUSED') {
+                console.error('Database server is not running or refusing connections');
+            } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+                console.error('Invalid database credentials');
+            } else if (err.code === 'ENOTFOUND') {
+                console.error('Database host not found');
+            }
+            
             console.error('Retrying in 5 seconds...');
             setTimeout(connectWithRetry, 5000);
             return;
         }
-        console.log('Connected to Railway MySQL database as id', connection.threadId);
+        console.log('✅ Connected to Railway MySQL database successfully');
+        console.log('Connection ID:', connection.threadId);
     });
 };
+
+// Handle connection errors during runtime
+connection.on('error', (err) => {
+    console.error('Database connection error:', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+        console.log('Reconnecting to database...');
+        connectWithRetry();
+    } else {
+        throw err;
+    }
+});
 
 connectWithRetry();
 
